@@ -1,5 +1,5 @@
 {
-    "name": "purple/dependency-injection",
+    "name": "purpleharmonie/dependency-injection",
     "description": "Purple Container is a lightweight dependency injection container for managing class dependencies and performing dependency injection in PHP applications.",
     "license": "MIT",
     "authors": [{
