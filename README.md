@@ -19,7 +19,7 @@ View the example folder for more features list
 You can install PHP Container via Composer. Run the following command in your terminal:
 
 ```
-composer require yourvendor/your-package
+composer require purple/dependency-injection
 ```
 
 ## Usage
