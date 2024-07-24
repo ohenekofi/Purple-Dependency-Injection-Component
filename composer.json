@@ -22,7 +22,10 @@
             "Purple\\Test\\": "tests/"
         }
     },
-    "require-dev": {
-        "phpunit/phpunit": "^11.1"
+    "require-dev": {        
+        "monolog/monolog": "^3.6",
+        "phpunit/phpunit": "^11.1",
+        "symfony/finder": "^7.1",
+        "symfony/yaml": "^7.1"
     }
 }
