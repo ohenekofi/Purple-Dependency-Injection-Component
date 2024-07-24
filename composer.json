@@ -19,6 +19,7 @@
     "autoload": {
         "psr-4": {
             "Purple\\Core\\": "src/",
+            "Purple\\Libs\\": "libs/",
             "Purple\\Test\\": "tests/"
         }
     },
