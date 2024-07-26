@@ -43,6 +43,7 @@ class Container
     private array $tags = [];
     private array $middlewares = [];
     public array $dependencyGraph = [];
+    public array $dependencyGraphCache = [];
     public array $resolvedServices = [];
     public array $dependencyStack = [];
     public array $resolving = [];
@@ -102,8 +103,15 @@ class Container
             $this->logger->info('Loaded services from cache.');
         } else {
             $this->logger->info('Building dependency graph and caching services.');
-            $this->cache->set('dependency_graph', $this->dependencyGraph);
+            //MUST BE ACTIVATED FOR CACHING
+            $this->cache->set('dependency_graph', $this->dependencyGraphCache);
         }
+    }
+
+    public function getCache()
+    {
+        return $cachedGraph = $this->cache->get('dependency_graph');
+
     }
 
     public function getDefinitionforCache(){
@@ -154,9 +162,22 @@ class Container
    
     public function set($id, $class)
     {
-        $this->services[$id] = ['class' => $class];
+       // $this->services[$id] = ['class' => $class];
         // for searching for services with their class names
-        $this->classTracker[$class] = [$id];
+       // $this->classTracker[$class] = [$id];
+
+
+        if ($class instanceof \Closure) {
+            $this->services[$id] = ['factory' => $class];
+        } elseif (is_callable($class)) {
+            $this->services[$id] = ['factory' => $class];
+        } else {
+            $this->services[$id] = ['class' => $class];
+        }
+         // for searching for services with their class names
+         if (is_string($class)) {
+            $this->classTracker[$class] = [$id];
+        }
         
         if ($this->setAutowire !== null &&  $this->setAutowire === true && $this->wireType === "hints") {
             $this->services[$id]['autowire'] = true;
@@ -459,6 +480,14 @@ class Container
         //means it was not instantitated via instances
         // Check if the service should be lazy loaded
 
+        if (isset($definition['factory'])) {
+            $factory = $definition['factory'];
+            if ($factory instanceof \Closure || is_callable($factory)) {
+                //print_r($definition['factory']);
+               return $service = $factory($this);
+            }
+        }
+
         $service = $this->serviceFactory->createService($id, $directRequest);
         
         if ($asShared === true) {
@@ -519,6 +548,8 @@ class Container
 
     public function get($id,$checkGlobalflag = true)
     {
+        $cache = $this->getCache();
+        //print_r($cache);
         if (isset($this->aliases[$id])) {
             $id = $this->aliases[$id];
         }
@@ -527,11 +558,22 @@ class Container
             $this->resolveDecorator($id);
         }
 
-        if (!isset($this->dependencyGraph[$id])) {
-            throw new ServiceNotFoundException("Service '$id' not found");
-        }
+        $definition = [];
+        //get from cache
+        if (!isset($cache[$id])) {
+            if (isset($this->dependencyGraph[$id])) {
+                $definition = $this->dependencyGraph[$id];
 
-        $definition = $this->dependencyGraph[$id];
+                //throw new ServiceNotFoundException("Service '$id' not found");
+            }elseif (!isset($this->dependencyGraph[$id])) {
+                throw new ServiceNotFoundException("Service '$id' not found");
+            }
+        }else{
+            $definition = $this->dependencyGraphCache[$id];
+        }
+    
+
+      //  $definition = $this->dependencyGraph[$id];
 
         if ($definition['lazy'] ?? false) {
             $lazyService  =  $this->createLazyProxy($id, $definition);
@@ -547,7 +589,6 @@ class Container
 
         // Check if the service is already instantiated (for singleton scope)
         if ($asShared === true && isset($this->instances[$id])) {
-            //echo "heeeeee";
             return $this->applyMiddleware($this->instances[$id], $id);
         }
         
@@ -565,6 +606,11 @@ class Container
     public function generateDependencyGraph()
     {   
         foreach ($this->services as $serviceName => $serviceConfig) {
+            
+            if(isset($serviceConfig['factory']) && !$serviceConfig['factory'] instanceof \Closure){
+                //print_r($serviceConfig);
+                $this->dependencyGraphCache[$serviceName] = $this->dependencyResolver->resolveDependencies($serviceName, $serviceConfig);
+            }
             $this->dependencyGraph[$serviceName] = $this->dependencyResolver->resolveDependencies($serviceName, $serviceConfig);
         }
       

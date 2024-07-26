@@ -1,0 +1,115 @@
+_defaults:
+  setAsGlobal: true      
+  setAutowire: false
+  setAnnotwire: false
+  wireType: hints
+  addGlobalMiddleware: Purple\Core\MiddlewareExamples\LoggingMiddlewares
+
+parameters:
+  db.host: '%DB_HOST%'
+  db.port: '%DB_PORT%'
+  db.username: '%DB_USERNAME%'
+  db.password: '%DB_PASSWORD%'
+  db.database: '%DB_DATABASE%'
+  db.charset: '%DB_CHARSET%'
+  db.options: []
+  migrations_dir: '/path/to/migrations'
+  migrations_table: 'migrations'
+  column: 'default_column'
+  config.database_path: '%config.database_path%'
+  harmonyConfig:
+    setting1: 'value1'
+    setting2: 'value2'
+
+services:
+  event_dispatcher:
+    class: Purple\Libs\Harmony\Events\EventDispatcher
+
+  harmony:
+    class: Purple\Libs\Harmony\Harmony
+    arguments:
+      - '@adapter'
+      - '@sql_builder'
+      - '@schema'
+      - '@executor'
+    method_calls:
+      - [initialize, []]
+    asGlobal: true
+    asShared: true  
+
+  adapter:
+    factory: [Purple\Libs\Harmony\Factories\AdapterFactory, create]
+    arguments:
+      - '%DB_CONNECTION%'
+      - '%DB_DATABASE%'
+      - '%DB_HOST%'
+      - '%DB_USERNAME%'
+      - '%DB_PASSWORD%'
+      - '%DB_CHARSET%'
+    implements: Purple\Libs\Harmony\Interface\DatabaseAdapterInterface
+
+  sql_builder:
+    factory: [Purple\Libs\Harmony\Factories\QueryBuilderFactory, create]
+    arguments:
+      - '@adapter'
+      - '@executor'
+
+  platform:
+    factory: [Purple\Libs\Harmony\Factories\PlatformFactory, create]
+    arguments:
+      - '%DB_CONNECTION%'
+    implements: Purple\Libs\Harmony\Interface\DatabasePlatform
+
+  schema:
+    class: Purple\Libs\Harmony\Schema
+    arguments:
+      - '@adapter'
+      - '@sql_builder'
+      - '@event_dispatcher'
+
+  executor:
+    class: Purple\Libs\Harmony\QueryExecutor
+    arguments:
+      - '@adapter'
+      - '@event_dispatcher'
+
+  migration_manager:
+    class: Purple\Libs\Harmony\MigrationManager
+    arguments:
+      - '@harmony'
+      - '%migrations_dir%'
+      - '%migrations_table%'
+
+  xpressive:
+    class: Purple\Libs\Harmony\Xpressive
+    autowire: true
+    tags: ['database']
+
+  mailer:
+    class: Purple\Core\Mailer
+
+  database:
+    class: Purple\Core\DbaseConnection
+    alias: database
+    tags: ['example']
+
+  logger:
+    class: Purple\Core\FileLogger
+    arguments:
+      - '@mailer'
+    asGlobal: true
+    asShared: true
+    addServiceMiddleware: Purple\Core\MiddlewareExamples\LoggingMiddlewares
+
+  some_service:
+    class: Purple\Core\SomeService
+    method_calls:
+      - [doSomething, []]
+    tags: ['example']
+    autowire: true
+
+#add services from files scanning and adding tagging   
+discovery:
+  App\Directory\:
+    resource: '../core/Db/Example/*'
+    exclude: '../core/Db/Example/{DependencyInjection,Entity,Migrations,Tests}'

@@ -47,6 +47,16 @@ Features:
 - Environment management
 - Debug mode
 - Bundle registration and booting
+  in using bundle registration, your set the $configDir path. the bunlde classes whould be organised in an array
+  and with each class extending the bundle interface. Find an example bundles in the examples folder
+  this is to cretae the bundle registry in the $config path. It loaded into services during kernel boot
+  ```php
+  <?php
+    // config/bundles.php
+    return [
+        Purple\Core\Services\Bundles\ExampleBundle::class,
+    ];
+  ```
 - Container initialization
 - Error handler setup
 
@@ -56,21 +66,97 @@ Features:
 - `set($id, $class)`: Register a service
 - `alias($alias, $service)`: Create an alias for a service
 - `addTag($id, $attributes)`: Tag a service
-- `scope($id, $scope)`: Set the scope of a service
 - `Configuring service visibility:` (asGlobal, asShared)
-- `asGlobal(true)` / `asGlobal(true)`: Set service visibility
+- `asGlobal(true)` / `asGlobal(true)`: Set service visibility. false by default 
 - `asShared(true)`: Mark a service as shared (singleton)
 - `setLazy(true)`: Enable/disable lazy loading for a service
 
 ### Service Configuration
-- `addArgument($id, $argument)`: Add an argument to a service
+- `addArgument($id, $argument)`: Add an argument to a service. 
 - `arguments($id, array $arguments)`: Set all arguments for a service
 - `addMethodCall($id, $method, $arguments)`: Add a method call to a service
-- `factory($id, $factory)`: Set a factory for a service
+- `factory($id, $factory)`: Set a factory for a service. inline factorie are not cached and also only php not yaml
 - `implements($name, $interface)`: Specify an interface implementation
 - `extends($id, $abstract)`: Set a service to extend another
 - `autowire($id)`: Enable autowiring for a service using type hints
 - `annotwire($id)`: Enable autowiring for a service using annotation
+
+```php
+
+<?php
+//services.php
+return function ($containerConfigurator) {
+    $services = $containerConfigurator->services();
+
+    //define harmony service with argument
+    $services->set('harmony', Harmony::class)
+        ->addArgument(new Reference('adapter'))
+        ->addArgument(new Reference('sql_builder'))
+        ->addArgument(new Reference('schema'))
+        ->addArgument(new Reference('executor'))
+        //->addArgument('%harmonyConfig%')
+        ->addMethodCall('initialize', [/*pass array of arguments*/]) //[@service,'%DB_ENV%', %PARAMETER%]
+        ->asGlobal(true)
+        ->asShared(true);
+
+    // Define a service using an inline factory
+    $services->set('database_connection', function ($container) {
+        $host = $container->getParameter('db.host');
+        $port = $container->getParameter('db.port');
+        $username = $container->getParameter('db.username');
+        $password = $container->getParameter('db.password');
+        $database = $container->getParameter('db.database');
+
+        return new DatabaseConnection($host, $port, $username, $password, $database);
+    })
+    ->asGlobal(true)
+    ->asShared(true);
+
+    // Define a service using an inline factory with dependencies
+    $services->set('user_repository', function ($container) {
+        $dbConnection = $container->get('database_connection');
+        return new UserRepository($dbConnection);
+    })
+    ->asGlobal(false)
+    ->asShared(true);
+
+    // You can also use arrow functions (PHP 7.4+) for more concise definitions
+    $services->set('logger', fn($container) => new Logger($container->getParameter('log_file')))
+        ->asGlobal(true) //available within and outiside the container 
+        ->asShared(true); //either a shared instance or new instance per request
+
+
+    //Defining factory with classes . 
+    $services->set('platform', PlatformFactory::class)
+        ->factory([PlatformFactory::class, 'create']) // Factory class name and method that returns the service
+        //->addArgument('$DB_CONNECTION$')
+        ->implements(DatabasePlatform::class) // handles the interface
+        ->asGlobal(false)
+        ->asShared(true)
+        ->autowire();
+
+    $services->set('some_service', SomeService::class)
+        ->asGlobal(false)->lazy()
+        ->asShared(true)
+        ->addMethodCall('doSomething',[]) // since the method is defined with arguments passed. it will be autorired. cos of autowire set on this service
+        ->addTag(['example'])
+        ->autowire(); //will use parameter type hinting to resolve the class
+
+    //with automatically autowire class and specified method using annotations. 
+    $services->set('userManager', UserManager::class)
+        ->asGlobal(true)
+        ->asShared(true)
+        ->addMethodCall('createUser',[])
+        ->annotwire();
+    
+    //arguments setting in bulk @service , env param %HOST% or passed param %parameter%
+    $services->set('xpressive', Xpressive::class)
+    ->asGlobal(false)
+    ->asShared(true)
+    ->autowire();
+    ->arguments(['@platform','@adapter','@executor']);
+};
+```
 
 ### New Methods
 - `bindIf($abstract, $concrete)`: Conditionally bind a service
@@ -83,6 +169,16 @@ Features:
 - Event dispatching
 - Listener registration with priorities
 
+```php
+//event dispatcher boot
+$eventDispatcher->addListener('kernel.pre_boot', function() {
+    echo "Kernel is about to boot!\n";
+});
+$eventDispatcher->addListener('kernel.post_boot', function() {
+    echo "Kernel has finished booting!\n";
+});
+```
+
 ## Kernel Extensions
 Modular way to extend and configure the kernel and container.
 
@@ -90,12 +186,64 @@ Features:
 - Extension registration
 - Container configuration through extensions
 
+```php
+$kernel->addExtension(new DatabaseExtension());
+
+<?php
+
+namespace Purple\Core\EventsExamples;
+
+use Purple\Core\Services\Container;
+use Purple\Core\Services\Interface\KernelExtensionInterface;
+
+// Example implementation
+class DatabaseExtension implements KernelExtensionInterface
+{
+    public function load(Container $container): void
+    {
+        $container->set('database', function(Container $c) {
+            return new DatabaseConnection(
+                $c->getParameter('db_host'),
+                $c->getParameter('db_name'),
+                $c->getParameter('db_user'),
+                $c->getParameter('db_pass')
+            );
+        });
+    }
+}
+
+//the extension interface that extensions must implement 
+<?php
+
+namespace Purple\Core\Services\Interface;
+
+use Purple\Core\Services\Container;
+
+interface KernelExtensionInterface
+{
+    public function load(Container $container): void;
+}
+
+```
+
 ## Configuration Management
 - Environment-specific configurations
 - Parameter management
 - Configuration file loading (YAML, PHP)
 - Support for .env files
 - Programmatic service definition
+
+```php
+// Load environment variables
+$kernel->loadEnv(__DIR__ . '/../.env');
+
+//either one or both 
+// Load service configurations from a file (e.g., YAML)
+$kernel->loadConfigurationFromFile(__DIR__ . '/../config/services.yaml');
+
+// Define services in PHP 
+$kernel->loadConfigurationFromFile(__DIR__ . '/../public/service.php');
+```
 
 ## Caching
 - Service graph caching
@@ -106,6 +254,41 @@ Features:
 ## Service Discovery
 Automatic discovery and registration of services based on directory structure and namespaces.
 
+```php
+//using type hinting 
+$kernel->autoDiscoverServices('../core/Db/Example', 'Purple\Core\Db\Example');
+
+using annotations 
+$container->annotationDiscovery([
+    'namespace' => [
+        'Purple\\Core\\AnnotEx' => [
+            'resource' => __DIR__.'/../core/AnnotEx',
+            'exclude' => []
+        ]
+    ]
+]);
+
+//services file
+ //internal autodirectory scanning and add to services definitions
+
+$containerConfigurator->discovery([
+    'Purple\Core\Db\Example\\' => [
+        'resource' => '../core/Db/Example/*',
+        'exclude' => ['../core/Db/Example/{DependencyInjection,Entity,Migrations,Tests}']
+    ]
+]);
+    
+   
+```
+```markdown
+//yaml services
+discovery:
+  App\Directory\:
+    resource: '../core/Db/Example/*'
+    exclude: '../core/Db/Example/{DependencyInjection,Entity,Migrations,Tests}' 
+```
+
+
 ## Service Tracking 
 Monitors service usage and implements basic garbage collection:
 - Tracks service usage frequency and last usage time
@@ -113,6 +296,7 @@ Monitors service usage and implements basic garbage collection:
 
 ## Compiler Passes
 Custom logic for modifying container configuration before it's compiled.
+view usage examples below and the examples folder 
 
 Features:
 - Priority-based execution

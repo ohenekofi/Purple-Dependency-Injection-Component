@@ -1,52 +1,26 @@
-<?php
-namespace Purple\Core\Services;
-use Purple\Core\Services\Interface\MiddlewareInterface;
+<?php 
 
-class ContainerConfigurator
+class ServiceConfigurator
 {
     private $container;
-    private $currentService;
-    private $currentServiceClass;
-    private $decoratedItem;
 
     public function __construct(Container $container)
     {
         $this->container = $container;
     }
 
-    public function services()
+    public function set($name, $class = null)
     {
+        
+        $this->currentService = $name;
+        $this->currentServiceClass = $class;
+
+        if ($concrete instanceof Closure) {
+             $this->container->set($name, $class);
+        }
+
+        $this->container->set($name, $class);
         return $this;
-    }
-
-    public function middlewares()
-    {
-        return $this;
-    }
-
-    public function defaults()
-    {
-        return $this;
-    }
-
-    public function setAsGlobal($state){
-        // Make services public (optional, depending on your needs)
-        $this->container->setAsGlobal($state);
-    }
-
-    public function setAutowire($state){
-        // Make services automatically autowire using typehints
-        $this->container->setAutowire($state);
-    }
-
-    public function setAnnotwire($state){
-        // Make services automatically autowire using annotations
-        $this->container->setAnnotwire($state);
-    }
-
-    public function wireType($type){
-        // choosing between annotwire and autowire
-        $this->container->wireType($type);
     }
 
     public function autoDiscover($directory){
@@ -77,15 +51,6 @@ class ContainerConfigurator
 
     public function annotationDiscovery(array $config){
         return $this->container->annotationDiscovery( $config);
-    }
-
-    public function set($name, $class)
-    {
-        $this->container->set($name, $class);
-        $this->currentService = $name;
-        $this->currentServiceClass = is_string($class) ? $class : null;
-
-        return $this;
     }
 
     public function getDefinition($serviceName)
@@ -226,10 +191,5 @@ class ContainerConfigurator
     {
         $this->container->annotwire($this->currentService);
         return $this;
-    }
-
-    public function finalize()
-    {
-        //$this->container->detectCircularDependencies();
     }
 }

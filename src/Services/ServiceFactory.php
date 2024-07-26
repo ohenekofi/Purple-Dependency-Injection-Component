@@ -29,10 +29,11 @@ class ServiceFactory
         $asGlobal =$definition['asGlobal'];
 
         if (!$asGlobal && !$directRequest) {
-           echo "allowed";
+           //echo "allowed";
         }
         // Handle factory creation
         if (isset($definition['factory_info'])) {
+            //print_r($definition);
             $factory = $definition['factory_info']['factory'];
             $arguments = $this->resolveReferences($definition['factory_info']['arguments']);
             
@@ -59,13 +60,11 @@ class ServiceFactory
                 call_user_func_array([$instance, $method], $methodArguments);
             }
         }
-
         //means it cant be called out the container via get only internal use
         if ($definition['asGlobal'] === true) {
             //$this->container->resolvedServices[$id] = $instance;
         }
      
-        
         return $instance;
     }
 
@@ -122,8 +121,7 @@ class ServiceFactory
             if (isset($arg['type']) && $arg['type'] === 'service_reference') {
                 $resolved[] = $this->container->get($arg['id'], false);
             } elseif (isset($arg['type']) && $arg['type'] === 'parameter') {
-                //$resolved[] = $arg['value'];
-                //echo   $this->getParameter($arg['name']);
+
                 $resolved[] = $this->container->getParameter($arg['name']);
             } elseif (isset($arg['type']) && $arg['type'] === 'default') {
                 if(empty($arg['value'])){
@@ -139,8 +137,5 @@ class ServiceFactory
 
         return $resolved;
     }
-
-
- 
 
 }

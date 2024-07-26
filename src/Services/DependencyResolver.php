@@ -5,6 +5,7 @@ use ReflectionClass;
 use ReflectionMethod;
 use ReflectionParameter;
 use Attribute;
+use Exception;
 use Purple\Core\Services\Exception\ServiceNotFoundException;
 use Purple\Core\Services\Exception\DependencyResolutionException;
 use Purple\Core\Services\Container;
@@ -93,7 +94,7 @@ class DependencyResolver
 
     private function handleFactoryRecursively($definition)
     {
-        if (isset($definition['factory'])) {
+        if (isset($definition['factory']) && !$definition['factory'] instanceof \Closure) {
             $factory = $definition['factory'];
             $factoryClass = $factory[0];
             $factoryMethod = $factory[1];
